@@ -1,4 +1,22 @@
-Product_Name,Price,PhaseI_1,PhaseI_2,PhaseI_3,PhaseII_UT,PhaseII_HE
-Headphones,"₩40,000",Long battery,Sound quality,Lightweight,"Warranty, Noise-Cancelling","Stylish, Noise-Cancelling"
-Headphones,"₩40,000",Long battery,Sound quality,Lightweight,"Warranty, Noise-Cancelling","Stylish, Noise-Cancelling"
-Headphones,"₩40,000",Long battery,Sound quality,Lightweight,"Warranty, Noise-Cancelling","Stylish, Noise-Cancelling"
+product_EN,product_KR,category,low,high,UT_1,UT_2,UT_3,PhaseII_UT,HE_1,HE_2,HE_3,PhaseII_HE
+bt_speaker,블루투스 스피커,전자기기,"33,000원","49,000원",완충 24시간 재생,생활 방수 IPX7 등급,전원만 켜면 잡히는 자동 연결,TEMP_PIIU,저음이 두껍게 깔리는 소리,손에 감기는 원통 형태,네 가지 색상 구성,TEMP_PIIH
+keyboard,저소음 무선 키보드,전자기기,"32,000원","48,000원",건전지 하나로 12개월,기기 세 대를 키 하나로 전환,윈도우와 맥 양쪽 지원,TEMP_PIIU,도서관에서도 눈치 안 보이는 타건음,두 가지 색을 섞은 키캡,손목이 편한 낮은 경사,TEMP_PIIH
+temp_elec,temp_전자,전자기기,"30,000원","50,000원",TEMP_UT1,TEMP_UT2,TEMP_UT3,TEMP_PIIU,TEMP_HE1,TEMP_HE2,TEMP_HE3,TEMP_PIIH
+toothbrush,전동 칫솔,셀프케어,"31,000원","47,000원",분당 31000회 진동,세기 5단계 조절,칫솔모 3개월치 동봉,TEMP_PIIU,잇몸을 부드럽게 훑는 미세모,물때가 덜 보이는 무광 마감,손에 감기는 굴곡 손잡이,TEMP_PIIH
+massage_roller,마사지 롤러,셀프케어,"30,000원","44,000원",뭉친 곳을 눌러 주는 돌기 배열,가방에 들어가는 길이,물세척 가능,TEMP_PIIU,손에서 미끄러지지 않는 그립,세 가지 색상 구성,곡면으로 다듬은 마감,TEMP_PIIH
+temp_self,temp_셀프,셀프케어,"30,000원","50,000원",TEMP_UT1,TEMP_UT2,TEMP_UT3,TEMP_PIIU,TEMP_HE1,TEMP_HE2,TEMP_HE3,TEMP_PIIH
+chair_seat,자세교정 방석,문구·사무,"33,000원","48,000원",골반을 세워 주는 경사 설계,커버 분리 세탁 가능,미끄럼 방지 바닥 처리,TEMP_PIIU,오래 앉아도 눌리지 않는 푹신함,여름에도 덜 더운 메시 상판,사무실에 무난한 무채색,TEMP_PIIH
+temp_stat,temp_문구,문구·사무,"30,000원","50,000원",TEMP_UT1,TEMP_UT2,TEMP_UT3,TEMP_PIIU,TEMP_HE1,TEMP_HE2,TEMP_HE3,TEMP_PIIH
+laptop_stand,노트북 거치대,문구·사무,"30,000원","45,000원",눈높이까지 올라가는 6단 조절,4kg까지 흔들리지 않는 지지,15.6인치까지 대응,TEMP_PIIU,접었을 때 손바닥만 한 두께,책상에 어울리는 무광 마감,두 가지 색상 구성,TEMP_PIIH
+backpack,백팩,의류·잡화,"33,000원","49,000원",1박 짐까지 들어가는 28L,노트북 전용 칸,생활 방수 원단,TEMP_PIIU,어깨를 파고들지 않는 넓은 끈,정장에도 어울리는 형태,네 가지 색상 구성,TEMP_PIIH
+windbreaker,바람막이,의류·잡화,"34,000원","50,000원",봉제선까지 막은 방수 처리,접어서 주머니에 들어가는 부피,세탁기 사용 가능,TEMP_PIIU,목까지 올라오는 깃,도심에서 입기 좋은 실루엣,다섯 가지 색상 구성,TEMP_PIIH
+temp_cloth,temp_의류,의류·잡화,"30,000원","50,000원",TEMP_UT1,TEMP_UT2,TEMP_UT3,TEMP_PIIU,TEMP_HE1,TEMP_HE2,TEMP_HE3,TEMP_PIIH
+temp_5A,temp_5A,temp_cat5,"30,000원","50,000원",TEMP_UT1,TEMP_UT2,TEMP_UT3,TEMP_PIIU,TEMP_HE1,TEMP_HE2,TEMP_HE3,TEMP_PIIH
+temp_5B,temp_5B,temp_cat5,"30,000원","50,000원",TEMP_UT1,TEMP_UT2,TEMP_UT3,TEMP_PIIU,TEMP_HE1,TEMP_HE2,TEMP_HE3,TEMP_PIIH
+temp_5C,temp_5C,temp_cat5,"30,000원","50,000원",TEMP_UT1,TEMP_UT2,TEMP_UT3,TEMP_PIIU,TEMP_HE1,TEMP_HE2,TEMP_HE3,TEMP_PIIH
+temp_6A,temp_6A,temp_cat6,"30,000원","50,000원",TEMP_UT1,TEMP_UT2,TEMP_UT3,TEMP_PIIU,TEMP_HE1,TEMP_HE2,TEMP_HE3,TEMP_PIIH
+temp_6B,temp_6B,temp_cat6,"30,000원","50,000원",TEMP_UT1,TEMP_UT2,TEMP_UT3,TEMP_PIIU,TEMP_HE1,TEMP_HE2,TEMP_HE3,TEMP_PIIH
+temp_6C,temp_6C,temp_cat6,"30,000원","50,000원",TEMP_UT1,TEMP_UT2,TEMP_UT3,TEMP_PIIU,TEMP_HE1,TEMP_HE2,TEMP_HE3,TEMP_PIIH
+temp_7A,temp_7A,temp_cat7,"30,000원","50,000원",TEMP_UT1,TEMP_UT2,TEMP_UT3,TEMP_PIIU,TEMP_HE1,TEMP_HE2,TEMP_HE3,TEMP_PIIH
+temp_7B,temp_7B,temp_cat7,"30,000원","50,000원",TEMP_UT1,TEMP_UT2,TEMP_UT3,TEMP_PIIU,TEMP_HE1,TEMP_HE2,TEMP_HE3,TEMP_PIIH
+temp_7C,temp_7C,temp_cat7,"30,000원","50,000원",TEMP_UT1,TEMP_UT2,TEMP_UT3,TEMP_PIIU,TEMP_HE1,TEMP_HE2,TEMP_HE3,TEMP_PIIH
