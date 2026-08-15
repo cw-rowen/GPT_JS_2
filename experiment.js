@@ -174,13 +174,13 @@ function allPairs(arr) {
   return pairs;
 }
 
-// OBJECTIVE D-vi/vii — degree-constrained edge orientation.
+// degree-constrained edge orientation.
 // Given a list of edges [u,v] (here: the 15 source-pairs) and a required "heavy" count
 // per node, picks one endpoint of each edge as "heavy" (the other becomes "light") so
 // that every node's heavy-count exactly matches its target. Retries with a fresh random
-// edge order until a valid assignment is found (always exists for our fixed target sums,
-// see Objective D confirmation from the research team: 3 sources get target 3-of-5 /
-// 2-of-5, the other 3 sources get 2-of-5 / 3-of-5, which always sums correctly).
+// edge order until a valid assignment is found (always exists for our fixed target sums:
+// 3 sources get target 3-of-5 / 2-of-5, the other 3 sources get 2-of-5 / 3-of-5, which
+// always sums correctly).
 function orientEdgesToTargets(edgeList, targetHeavy, maxTries = 20000) {
   // NOTE: edges are processed in a randomized order internally (needed for the
   // greedy-with-retry search below), but the returned array must line up 1:1,
@@ -488,6 +488,12 @@ let introClock, introKey;
 let phase2IntroClock, phase2IntroKey;
 let finalClock, finalStim;
 
+// LOCKOUT / PAUSE (ported from REFERENCE.js): if the participant leaves fullscreen
+// (Esc, Alt-Tab, etc.) mid-experiment, everything is hidden and a pause screen asks
+// Y (quit) / N (resume + re-enter fullscreen). See pauseStim / _escPending below.
+let pauseStim;
+let _escPending = false;
+
 // shared stimuli
 let sourceLabelStim, productLabelStim, brandStims;      // PhaseI screen 1 / shared header
 let questionStim;                                       // PhaseI screen 2
@@ -518,6 +524,8 @@ let trialIndex = 0;
 // per-trial state (PhaseI)
 let _p1Clock, _p1Phase, _p1PhaseStartT, _p1PhaseDuration;
 let _p1Selected, _p1ResponseGiven, _p1StartT;
+let _p1DisplayOrder; // the 3 (brand,detail) rows in their on-screen order — kept so a
+                      // LOCKOUT/PAUSE resume can redraw the exact same trial as before
 
 // per-trial state (PhaseII)
 let _p2Clock, _p2Phase, _p2PhaseStartT, _p2PhaseDuration;
@@ -594,7 +602,7 @@ async function experimentInit() {
 
   // ── PhaseI Screen 2: interest question ──
   questionStim = new visual.TextStim({
-    win, name: 'questionStim', text: '이 제품들에 관심이 있으신가요?',
+    win, name: 'questionStim', text: '이 중에 구매할만한 제품이 있나요?',
     pos: [0, CFG.question_y], height: CFG.text_height_question,
     color: _colWhite, font: CFG.font, bold: CFG.text_bold,
     alignText: 'center', anchor: 'center', units: 'height',
@@ -673,6 +681,31 @@ async function experimentInit() {
     win, name: 'fixStim', text: '+',
     pos: [0, 0], height: 0.08, color: _colWhite, font: CFG.font, bold: CFG.text_bold,
     alignText: 'center', anchor: 'center', units: 'height',
+  });
+
+  // ── LOCKOUT / PAUSE screen ──
+    pauseStim = new visual.TextStim({
+    win, name: 'pauseStim',
+    text: '실험을 종료하시겠습니까?\n종료 시 재시작 또는 재참여가 불가합니다.\n\nY = 종료\nN = 계속',
+    pos: [0, 0], height: 0.055, color: _colWhite, font: CFG.font, bold: CFG.text_bold,
+    alignText: 'center', anchor: 'center', units: 'height', wrapWidth: 1.4,
+    depth: -10, // always draws in front of every other stim
+  });
+
+  // Fires whenever the browser leaves fullscreen (Esc key, Alt-Tab out, etc.) at any
+  // point in the experiment. Hides whatever routine is currently on screen and shows
+  // the pause prompt; each routine's EachFrame function is responsible for handling
+  // the Y/N response and, on resume, redrawing its own current state (see _escPending
+  // checks below).
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement &&
+        !_escPending &&
+        psychoJS.experiment &&
+        !psychoJS.experiment.experimentEnded) {
+      _escPending = true;
+      allRoutinesStimOff();
+      pauseStim.setAutoDraw(true);
+    }
   });
 
   // ── instructions screens ──
@@ -827,6 +860,18 @@ function introPageStimOff() {
   introPageStartingStim.setAutoDraw(false);
 }
 
+// LOCKOUT / PAUSE: turns off every stim from every routine, since the fullscreen-exit
+// listener can fire at any point in the experiment and doesn't know which routine is
+// currently active.
+function allRoutinesStimOff() {
+  allStimOff();
+  catStimOff();
+  introPageStimOff();
+  instructionsStim.setAutoDraw(false);
+  phase2IntroStim.setAutoDraw(false);
+  finalStim.setAutoDraw(false);
+}
+
 function scaleSetAutoDraw(val) {
   scale_circles.forEach(c => c.setAutoDraw(val));
   scale_numbers.forEach(n => n.setAutoDraw(val));
@@ -869,6 +914,27 @@ function categorySelectRoutineEachFrame() {
   return async function () {
     const t = _catClock.getTime();
     if (psychoJS.experiment.experimentEnded) return quitPsychoJS('Experiment ended', false);
+
+    // LOCKOUT / PAUSE: while paused, wait for Y (quit) or N (resume)
+    if (_escPending) {
+      const confirm = psychoJS.eventManager.getKeys({ keyList: ['y', 'n'] });
+      for (const k of confirm) {
+        const name = k.name || k;
+        if (name === 'y') return quitPsychoJS('사용자 종료', false);
+        if (name === 'n') {
+          pauseStim.setAutoDraw(false);
+          catTitleStim.setAutoDraw(true);
+          catInstrStim.setAutoDraw(true);
+          catRowStims.forEach(s => s.setAutoDraw(true));
+          updateCatRowColors();
+          if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+            document.documentElement.requestFullscreen().catch(() => {});
+          }
+          _escPending = false;
+        }
+      }
+      return Scheduler.Event.FLIP_REPEAT;
+    }
 
     // number keys '1'..'9', one per category 
     const digitKeys = categoryList.map((_, i) => String(i + 1));
@@ -975,9 +1041,28 @@ function instructionsRoutineBegin() {
 
 function instructionsRoutineEachFrame() {
   return async function () {
+    if (psychoJS.experiment.experimentEnded) return quitPsychoJS('Experiment ended', false);
+
+    // LOCKOUT / PAUSE: while paused, wait for Y (quit) or N (resume)
+    if (_escPending) {
+      const confirm = psychoJS.eventManager.getKeys({ keyList: ['y', 'n'] });
+      for (const k of confirm) {
+        const name = k.name || k;
+        if (name === 'y') return quitPsychoJS('사용자 종료', false);
+        if (name === 'n') {
+          pauseStim.setAutoDraw(false);
+          instructionsStim.setAutoDraw(true);
+          if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+            document.documentElement.requestFullscreen().catch(() => {});
+          }
+          _escPending = false;
+        }
+      }
+      return Scheduler.Event.FLIP_REPEAT;
+    }
+
     const pressed = psychoJS.eventManager.getKeys({ keyList: ['space'] });
     if (pressed.length > 0) _instrContinue = false;
-    if (psychoJS.experiment.experimentEnded) return quitPsychoJS('Experiment ended', false);
     if (!_instrContinue) return Scheduler.Event.NEXT;
     return Scheduler.Event.FLIP_REPEAT;
   };
@@ -1035,6 +1120,28 @@ function sourceIntroRoutineEachFrame() {
   return async function () {
     const t = _introClock.getTime();
     if (psychoJS.experiment.experimentEnded) return quitPsychoJS('Experiment ended', false);
+
+    // LOCKOUT / PAUSE: while paused, wait for Y (quit) or N (resume)
+    if (_escPending) {
+      const confirm = psychoJS.eventManager.getKeys({ keyList: ['y', 'n'] });
+      for (const k of confirm) {
+        const name = k.name || k;
+        if (name === 'y') return quitPsychoJS('사용자 종료', false);
+        if (name === 'n') {
+          pauseStim.setAutoDraw(false);
+          introPageLabelStim.setAutoDraw(true);
+          introPageBodyStim.setAutoDraw(true);
+          introPageHintStim.setAutoDraw(true);
+          if (_introWarnVisible) introPageWarnStim.setAutoDraw(true);
+          if (_introStartingT !== null) introPageStartingStim.setAutoDraw(true);
+          if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+            document.documentElement.requestFullscreen().catch(() => {});
+          }
+          _escPending = false;
+        }
+      }
+      return Scheduler.Event.FLIP_REPEAT;
+    }
 
     const pressed = psychoJS.eventManager.getKeys({ keyList: ['left', 'right', 'space'] });
 
@@ -1099,9 +1206,28 @@ function phase2IntroRoutineBegin() {
 
 function phase2IntroRoutineEachFrame() {
   return async function () {
+    if (psychoJS.experiment.experimentEnded) return quitPsychoJS('Experiment ended', false);
+
+    // LOCKOUT / PAUSE: while paused, wait for Y (quit) or N (resume)
+    if (_escPending) {
+      const confirm = psychoJS.eventManager.getKeys({ keyList: ['y', 'n'] });
+      for (const k of confirm) {
+        const name = k.name || k;
+        if (name === 'y') return quitPsychoJS('사용자 종료', false);
+        if (name === 'n') {
+          pauseStim.setAutoDraw(false);
+          phase2IntroStim.setAutoDraw(true);
+          if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+            document.documentElement.requestFullscreen().catch(() => {});
+          }
+          _escPending = false;
+        }
+      }
+      return Scheduler.Event.FLIP_REPEAT;
+    }
+
     const pressed = psychoJS.eventManager.getKeys({ keyList: ['space'] });
     if (pressed.length > 0) _instrContinue = false;
-    if (psychoJS.experiment.experimentEnded) return quitPsychoJS('Experiment ended', false);
     if (!_instrContinue) return Scheduler.Event.NEXT;
     return Scheduler.Event.FLIP_REPEAT;
   };
@@ -1141,6 +1267,7 @@ function phase1TrialRoutineBegin(pos) {
     _p1Phase         = 'screen1';
     _p1Selected      = null;
     _p1ResponseGiven = false;
+    _escPending      = false; // LOCKOUT/PAUSE: reset pause state for every new trial
 
     sourceLabelStim.setText(SOURCE_LABEL_MAP[trial.source] || trial.source);
     productLabelStim.setText(trial.productNameKR);
@@ -1150,10 +1277,10 @@ function phase1TrialRoutineBegin(pos) {
     productLabelStim.setAutoDraw(true);
 
     // show all 3 brand rows (randomized on-screen order)
-    const displayOrder = randomPyShuffle([...trial.phase1Details]);
-    displayOrder.forEach((entry, i) => {
+    _p1DisplayOrder = randomPyShuffle([...trial.phase1Details]);
+    _p1DisplayOrder.forEach((entry, i) => {
       brandStims[i].setPos([0, CFG.brand_row_ys[i]]);
-      brandStims[i].setText(`${entry.brand}\n${entry.text}`);
+      brandStims[i].setText(`Brand ${entry.brand}\n${entry.text}`);
       brandStims[i].setAutoDraw(true);
     });
 
@@ -1167,13 +1294,14 @@ function phase1TrialRoutineBegin(pos) {
     psychoJS.experiment.addData('PairedWith',        trial.pairedWith);
     psychoJS.experiment.addData('MixType',           trial.mixType); // UT_heavy (2UT+1HE) or HE_heavy (1UT+2HE)
     psychoJS.experiment.addData('Price',             trial.price);
-    displayOrder.forEach((entry, i) => {
+    _p1DisplayOrder.forEach((entry, i) => {
       psychoJS.experiment.addData(`Brand${i + 1}_Letter`,     entry.brand);
       psychoJS.experiment.addData(`Brand${i + 1}_DetailKey`,  entry.key);
       psychoJS.experiment.addData(`Brand${i + 1}_DetailText`, entry.text);
     });
     psychoJS.experiment.addData('InterestRating',    '');
     psychoJS.experiment.addData('InterestRating_RT', '');
+    psychoJS.experiment.addData('Phase1_Restarted',  '');
 
     psychoJS.eventManager.clearEvents({ eventType: 'keyboard' });
     return Scheduler.Event.NEXT;
@@ -1184,6 +1312,41 @@ function phase1TrialRoutineEachFrame(pos) {
   return async function () {
     const t = _p1Clock.getTime();
     if (psychoJS.experiment.experimentEnded) return quitPsychoJS('Experiment ended', false);
+
+    // LOCKOUT / PAUSE: while paused, wait for Y (quit) or N (resume).
+    // On resume the trial restarts from the beginning (matching REFERENCE.js).
+    if (_escPending) {
+      const confirm = psychoJS.eventManager.getKeys({ keyList: ['y', 'n'] });
+      for (const k of confirm) {
+        const name = k.name || k;
+        if (name === 'y') return quitPsychoJS('사용자 종료', false);
+        if (name === 'n') {
+          pauseStim.setAutoDraw(false);
+          allStimOff();
+          _p1Clock.reset();
+          _p1PhaseStartT   = 0;
+          _p1PhaseDuration = CFG.phase1_screen1_dur;
+          _p1Phase         = 'screen1';
+          _p1Selected      = null;
+          _p1ResponseGiven = false;
+          psychoJS.experiment.addData('Phase1_Restarted', 1);
+
+          sourceLabelStim.setAutoDraw(true);
+          productLabelStim.setAutoDraw(true);
+          _p1DisplayOrder.forEach((entry, i) => {
+            brandStims[i].setPos([0, CFG.brand_row_ys[i]]);
+            brandStims[i].setText(`Brand ${entry.brand}\n${entry.text}`);
+            brandStims[i].setAutoDraw(true);
+          });
+
+          if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+            document.documentElement.requestFullscreen().catch(() => {});
+          }
+          _escPending = false;
+        }
+      }
+      return Scheduler.Event.FLIP_REPEAT;
+    }
 
     // Screen 1: brands shown for a fixed duration
     if (_p1Phase === 'screen1') {
@@ -1293,11 +1456,12 @@ function phase2TrialRoutineBegin(pos) {
     _p2Phase         = 'screen1';
     _p2Selected      = null;
     _p2ChoiceGiven   = false;
+    _escPending      = false; // LOCKOUT/PAUSE: reset pause state for every new trial
 
     // [Endorser] / PRODUCT — BRAND[LETTER] / carried-forward detail /
     // PhaseII_UT or PhaseII_HE reveal / price, top to bottom.
     sourceLabelStim.setText(SOURCE_LABEL_MAP[trial.source] || trial.source);
-    productLabelStim.setText(`${trial.productNameKR} — ${trial.phase2Brand}`);
+    productLabelStim.setText(`${trial.productNameKR} — Brand ${trial.phase2Brand}`);
     detailTextStim.setText(trial.phase2DetailText);
     bodyTextStim.setText(trial.phase2RevealText);
     priceStim.setText(`가격: ${formatWon(trial.price)}`);
@@ -1325,6 +1489,7 @@ function phase2TrialRoutineBegin(pos) {
     psychoJS.experiment.addData('Price',              trial.price);
     psychoJS.experiment.addData('Choice',             '');
     psychoJS.experiment.addData('Choice_RT',          '');
+    psychoJS.experiment.addData('Phase2_Restarted',   '');
 
     psychoJS.eventManager.clearEvents({ eventType: 'keyboard' });
     return Scheduler.Event.NEXT;
@@ -1335,6 +1500,39 @@ function phase2TrialRoutineEachFrame(pos) {
   return async function () {
     const t = _p2Clock.getTime();
     if (psychoJS.experiment.experimentEnded) return quitPsychoJS('Experiment ended', false);
+
+    // LOCKOUT / PAUSE: while paused, wait for Y (quit) or N (resume).
+    // On resume the trial restarts from the beginning (matching REFERENCE.js).
+    if (_escPending) {
+      const confirm = psychoJS.eventManager.getKeys({ keyList: ['y', 'n'] });
+      for (const k of confirm) {
+        const name = k.name || k;
+        if (name === 'y') return quitPsychoJS('사용자 종료', false);
+        if (name === 'n') {
+          pauseStim.setAutoDraw(false);
+          allStimOff();
+          _p2Clock.reset();
+          _p2PhaseStartT   = 0;
+          _p2PhaseDuration = CFG.phase2_reveal_delay;
+          _p2Phase         = 'screen1';
+          _p2Selected      = null;
+          _p2ChoiceGiven   = false;
+          psychoJS.experiment.addData('Phase2_Restarted', 1);
+
+          sourceLabelStim.setAutoDraw(true);
+          productLabelStim.setAutoDraw(true);
+          detailTextStim.setAutoDraw(true);
+          bodyTextStim.setAutoDraw(true);
+          priceStim.setAutoDraw(true);
+
+          if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+            document.documentElement.requestFullscreen().catch(() => {});
+          }
+          _escPending = false;
+        }
+      }
+      return Scheduler.Event.FLIP_REPEAT;
+    }
 
     // Screen 1: detail + reveal + price shown alone for a fixed delay
     if (_p2Phase === 'screen1') {
@@ -1407,6 +1605,25 @@ function finalRoutineEachFrame() {
   return async function () {
     const t = finalClock.getTime();
     if (psychoJS.experiment.experimentEnded) return quitPsychoJS('Experiment ended', false);
+
+    // LOCKOUT / PAUSE: while paused, wait for Y (quit) or N (resume)
+    if (_escPending) {
+      const confirm = psychoJS.eventManager.getKeys({ keyList: ['y', 'n'] });
+      for (const k of confirm) {
+        const name = k.name || k;
+        if (name === 'y') return quitPsychoJS('사용자 종료', false);
+        if (name === 'n') {
+          pauseStim.setAutoDraw(false);
+          finalStim.setAutoDraw(true);
+          if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+            document.documentElement.requestFullscreen().catch(() => {});
+          }
+          _escPending = false;
+        }
+      }
+      return Scheduler.Event.FLIP_REPEAT;
+    }
+
     if (t >= 5.0) return Scheduler.Event.NEXT;
     return Scheduler.Event.FLIP_REPEAT;
   };
