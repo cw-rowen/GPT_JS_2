@@ -217,9 +217,10 @@ function orientEdgesToTargets(edgeList, targetHeavy, maxTries = 20000) {
 }
 
 // two-letter brand codes.
-// 9 vowel-vowel, 21 vowel-consonant,21 consonant-vowel, 39 consonant-consonant. 
-// VV is capped at 9 because only 9 safe vowel-vowel codes exist after exclusions; 
-// CC is the largest share because it's the most naturally available pattern.
+// 8 vowel-vowel, 21 vowel-consonant, 21 consonant-vowel, 40 consonant-consonant. 
+// VV is capped at 8 because only 8 safe vowel-vowel codes exist once exclusions 
+// are applied; CC is the largest share because it's the most naturally available pattern.
+// Order below is arbitrary; the pool is reshuffled every run via randomPyShuffle.
 const FIXED_BRAND_POOL = [
   'AC', 'AJ', 'AV', 'BU', 'CE', 'DA', 'DG', 'DN', 'DP', 'DV',
   'EF', 'EI', 'EL', 'EM', 'EN', 'EO', 'FD', 'FE', 'FG', 'FH',
@@ -443,7 +444,6 @@ flowScheduler.add(categorySelectRoutineEachFrame());
 flowScheduler.add(categorySelectRoutineEnd());
 
 flowScheduler.add(finalizeTrials);
-flowScheduler.add(logSetupInfo);
 
 flowScheduler.add(instructionsRoutineBegin());
 flowScheduler.add(instructionsRoutineEachFrame());
@@ -1018,16 +1018,10 @@ async function finalizeTrials() {
   return Scheduler.Event.NEXT;
 }
 
-// writes one dedicated CSV row capturing the participant-level setup (category
-// choices + which sources got TYPE A / TYPE B this run) before any trial rows
-async function logSetupInfo() {
-  psychoJS.experiment.addData('Phase', 'SETUP');
-  psychoJS.experiment.addData('ExcludedCategories', excludedCategories.join('|') || 'none');
-  psychoJS.experiment.addData('ChosenCategories',    chosenCategories.join('|'));
-  SOURCE_TYPES.forEach(s => psychoJS.experiment.addData(`SourceType_${s}`, sourceTypeMap[s]));
-  psychoJS.experiment.nextEntry();
-  return Scheduler.Event.NEXT;
-}
+// NOTE: participant-level setup info (excluded/chosen categories, source A/B types) is no
+// longer written as a separate CSV row — sourceType is already reflected in each trial's
+// MixType, so a dedicated SETUP row isn't needed. excludedCategories, chosenCategories, and
+// sourceTypeMap remain available in memory for any internal logic that still needs them.
 
 // ─────────────────────────────────────────────
 //  INSTRUCTIONS ROUTINE
@@ -1290,24 +1284,43 @@ function phase1TrialRoutineBegin(pos) {
       brandStims[i].setAutoDraw(true);
     });
 
+    // NOTE: trial.sourceType is still available here for internal logic (it's what MixType
+    // is derived from), but is intentionally not written to the CSV — MixType alone is recorded.
+    //
+    // ParticipantID/date/frameRate are called explicitly here (in addition to living in
+    // expInfo/extraInfo) so their column position is guaranteed rather than left to however
+    // the library places extraInfo columns. Phase2-only fields (PI_*, PII_*, Purchase*) are
+    // written here too, as blank placeholders, purely so this — the very first row written
+    // each session — establishes the full 27-column order up front; Phase 2 trials later just
+    // fill in the real values for those same columns.
+    psychoJS.experiment.addData('ParticipantID',    expInfo['ParticipantID']);
     psychoJS.experiment.addData('Phase',            1);
     psychoJS.experiment.addData('TrialNumber',       trialIndex);
+    psychoJS.experiment.addData('Category',          trial.category);
     psychoJS.experiment.addData('Product_EN',        trial.productNameEN);
     psychoJS.experiment.addData('Product_KR',        trial.productNameKR);
-    psychoJS.experiment.addData('Category',          trial.category);
-    psychoJS.experiment.addData('Source',            trial.source);
-    psychoJS.experiment.addData('SourceType',        trial.sourceType);
-    psychoJS.experiment.addData('PairedWith',        trial.pairedWith);
-    psychoJS.experiment.addData('MixType',           trial.mixType); // UT_heavy (2UT+1HE) or HE_heavy (1UT+2HE)
     psychoJS.experiment.addData('Price',             trial.price);
+    psychoJS.experiment.addData('Source',            trial.source);
+    psychoJS.experiment.addData('MixType',           trial.mixType); // UT_heavy (2UT+1HE) or HE_heavy (1UT+2HE)
+    psychoJS.experiment.addData('PairedWith',        trial.pairedWith);
     _p1DisplayOrder.forEach((entry, i) => {
-      psychoJS.experiment.addData(`Brand${i + 1}_Letter`,     entry.brand);
-      psychoJS.experiment.addData(`Brand${i + 1}_DetailKey`,  entry.key);
-      psychoJS.experiment.addData(`Brand${i + 1}_DetailText`, entry.text);
+      psychoJS.experiment.addData(`Br${i + 1}`,      entry.brand);
+      psychoJS.experiment.addData(`Br${i + 1}_Key`,  entry.key);
+      // entry.text (the detail text shown on screen) is deliberately not written to CSV
     });
-    psychoJS.experiment.addData('InterestRating',    '');
-    psychoJS.experiment.addData('InterestRating_RT', '');
-    psychoJS.experiment.addData('Phase1_Restarted',  '');
+    psychoJS.experiment.addData('Interest',          '');
+    psychoJS.experiment.addData('Interest_RT',       '');
+    psychoJS.experiment.addData('PI_Brand',          '');
+    psychoJS.experiment.addData('PI_Key',            '');
+    psychoJS.experiment.addData('PI_Text',           '');
+    psychoJS.experiment.addData('PII_UTHE',          '');
+    psychoJS.experiment.addData('PII_Text',          '');
+    psychoJS.experiment.addData('Purchase',          '');
+    psychoJS.experiment.addData('Purchase_RT',       '');
+    psychoJS.experiment.addData('Trial_Restarted',   '');
+    psychoJS.experiment.addData('date',              expInfo['date']);
+    psychoJS.experiment.addData('frameRate',         expInfo['frameRate']);
+
 
     psychoJS.eventManager.clearEvents({ eventType: 'keyboard' });
     return Scheduler.Event.NEXT;
@@ -1335,7 +1348,7 @@ function phase1TrialRoutineEachFrame(pos) {
           _p1Phase         = 'screen1';
           _p1Selected      = null;
           _p1ResponseGiven = false;
-          psychoJS.experiment.addData('Phase1_Restarted', 1);
+          psychoJS.experiment.addData('Trial_Restarted', 1);
 
           sourceLabelStim.setAutoDraw(true);
           productLabelStim.setAutoDraw(true);
@@ -1408,8 +1421,8 @@ function phase1TrialRoutineEachFrame(pos) {
         } else if (name === 'return' && _p1Selected !== null) {
           const score = _p1Selected + 1;
           const rt = t - _p1StartT;
-          psychoJS.experiment.addData('InterestRating', score);
-          psychoJS.experiment.addData('InterestRating_RT', rt);
+          psychoJS.experiment.addData('Interest', score);
+          psychoJS.experiment.addData('Interest_RT', rt);
           _p1ResponseGiven = true;
         }
       }
@@ -1479,23 +1492,31 @@ function phase2TrialRoutineBegin(pos) {
     bodyTextStim.setAutoDraw(true);
     priceStim.setAutoDraw(true);
 
+    // NOTE: trial.sourceType remains available on the trial object for internal logic,
+    // but is intentionally not written to the CSV (see Phase 1 block). Column order here
+    // doesn't need to be re-established — Phase 1's first row already fixed it — this block
+    // just fills in the real values for whichever of those columns apply to Phase 2.
+    psychoJS.experiment.addData('ParticipantID',     expInfo['ParticipantID']);
     psychoJS.experiment.addData('Phase',             2);
     psychoJS.experiment.addData('TrialNumber',        trialIndex);
+    psychoJS.experiment.addData('Category',           trial.category);
     psychoJS.experiment.addData('Product_EN',         trial.productNameEN);
     psychoJS.experiment.addData('Product_KR',         trial.productNameKR);
-    psychoJS.experiment.addData('Category',           trial.category);
-    psychoJS.experiment.addData('Source',             trial.source);
-    psychoJS.experiment.addData('SourceType',         trial.sourceType);
-    psychoJS.experiment.addData('PairedWith',         trial.pairedWith);
-    psychoJS.experiment.addData('Phase2_Brand',       trial.phase2Brand);
-    psychoJS.experiment.addData('Phase2_DetailKey',   trial.phase2DetailKey);
-    psychoJS.experiment.addData('Phase2_DetailText',  trial.phase2DetailText);
-    psychoJS.experiment.addData('Phase2_RevealType',  trial.phase2RevealType); // UT or HE
-    psychoJS.experiment.addData('Phase2_RevealText',  trial.phase2RevealText);
     psychoJS.experiment.addData('Price',              trial.price);
-    psychoJS.experiment.addData('Choice',             '');
-    psychoJS.experiment.addData('Choice_RT',          '');
-    psychoJS.experiment.addData('Phase2_Restarted',   '');
+    psychoJS.experiment.addData('Source',             trial.source);
+    psychoJS.experiment.addData('MixType',            trial.mixType); // same product/source mix as its Phase 1 counterpart
+    psychoJS.experiment.addData('PairedWith',         trial.pairedWith);
+    psychoJS.experiment.addData('PI_Brand',           trial.phase2Brand);
+    psychoJS.experiment.addData('PI_Key',             trial.phase2DetailKey);
+    psychoJS.experiment.addData('PI_Text',            trial.phase2DetailText);
+    psychoJS.experiment.addData('PII_UTHE',           trial.phase2RevealType); // UT or HE
+    psychoJS.experiment.addData('PII_Text',           trial.phase2RevealText);
+    psychoJS.experiment.addData('Purchase',           '');
+    psychoJS.experiment.addData('Purchase_RT',        '');
+    psychoJS.experiment.addData('Trial_Restarted',    '');
+    psychoJS.experiment.addData('date',               expInfo['date']);
+    psychoJS.experiment.addData('frameRate',          expInfo['frameRate']);
+
 
     psychoJS.eventManager.clearEvents({ eventType: 'keyboard' });
     return Scheduler.Event.NEXT;
@@ -1523,7 +1544,7 @@ function phase2TrialRoutineEachFrame(pos) {
           _p2Phase         = 'screen1';
           _p2Selected      = null;
           _p2ChoiceGiven   = false;
-          psychoJS.experiment.addData('Phase2_Restarted', 1);
+          psychoJS.experiment.addData('Trial_Restarted', 1);
 
           sourceLabelStim.setAutoDraw(true);
           productLabelStim.setAutoDraw(true);
@@ -1567,8 +1588,8 @@ function phase2TrialRoutineEachFrame(pos) {
         if (name === 'return' && _p2Selected !== null) {
           const choiceText = _p2Selected === 0 ? '구매한다' : '구매하지 않는다';
           const rt = t - _p2StartT;
-          psychoJS.experiment.addData('Choice', choiceText);
-          psychoJS.experiment.addData('Choice_RT', rt);
+          psychoJS.experiment.addData('Purchase', choiceText);
+          psychoJS.experiment.addData('Purchase_RT', rt);
           _p2ChoiceGiven = true;
         }
       }
