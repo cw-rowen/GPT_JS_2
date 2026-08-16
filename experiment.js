@@ -217,20 +217,26 @@ function orientEdgesToTargets(edgeList, targetHeavy, maxTries = 20000) {
 }
 
 // two-letter brand codes.
-// builds every valid A..Z x A..Z code EXCEPT same-letter pairs (AA, BB, ...) and "AI",
-// then shuffles once. Codes are handed out from this shared, pre-shuffled pool so that
-// no code is ever reused anywhere in the experiment (globally unique)
+// 9 vowel-vowel, 21 vowel-consonant,21 consonant-vowel, 39 consonant-consonant. 
+// VV is capped at 9 because only 9 safe vowel-vowel codes exist after exclusions; 
+// CC is the largest share because it's the most naturally available pattern.
+const FIXED_BRAND_POOL = [
+  'AC', 'AJ', 'AV', 'BU', 'CE', 'DA', 'DG', 'DN', 'DP', 'DV',
+  'EF', 'EI', 'EL', 'EM', 'EN', 'EO', 'FD', 'FE', 'FG', 'FH',
+  'FN', 'FU', 'FV', 'HG', 'HS', 'HV', 'HY', 'IB', 'IH', 'IK',
+  'IV', 'IW', 'IY', 'JF', 'JL', 'JU', 'JV', 'KC', 'KJ', 'KL',
+  'KO', 'KQ', 'KU', 'LD', 'LF', 'LH', 'LJ', 'LO', 'OA', 'OE',
+  'OI', 'OL', 'OU', 'OV', 'PU', 'PZ', 'QE', 'QO', 'QP', 'QY',
+  'RD', 'RF', 'RH', 'SP', 'SQ', 'TA', 'TB', 'TE', 'TS', 'TU',
+  'UC', 'UD', 'UE', 'UF', 'UJ', 'UL', 'UO', 'UQ', 'VH', 'VO',
+  'WN', 'WO', 'XA', 'XE', 'XF', 'XZ', 'YA', 'YD', 'YJ', 'ZO',
+];
+
 function buildLetterPool() {
-  const letters = [];
-  for (let i = 0; i < 26; i++) {
-    for (let j = 0; j < 26; j++) {
-      if (i === j) continue;                                   // no AA, BB, CC, ...
-      const code = String.fromCharCode(65 + i) + String.fromCharCode(65 + j);
-      if (code === 'AI') continue;                             // explicit exclusion
-      letters.push(code);
-    }
+  if (FIXED_BRAND_POOL.length !== 90) {
+    throw new Error(`FIXED_BRAND_POOL must contain exactly 90 codes (found ${FIXED_BRAND_POOL.length}).`);
   }
-  return randomPyShuffle(letters);
+  return randomPyShuffle([...FIXED_BRAND_POOL]);
 }
 
 // parses a CSV price string like "33,000원" into an integer (33000).
